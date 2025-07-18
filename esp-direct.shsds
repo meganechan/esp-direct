@@ -1,0 +1,37 @@
+{
+  "AutomaticReconnect": true,
+  "SerialPortName": "COM9",
+  "StartupDelayMs": 0,
+  "IsConnecting": false,
+  "IsEnabled": true,
+  "LogIncomingData": true,
+  "IsConnected": true,
+  "BaudRate": 115200,
+  "DtrEnable": true,
+  "RtsEnable": true,
+  "EditorExpanded": true,
+  "Name": "Custom Serial device",
+  "Description": "Serial device",
+  "LastErrorDate": "0001-01-01T00:00:00",
+  "LastErrorMessage": null,
+  "IsFreezed": false,
+  "SettingsBuilder": {
+    "Settings": [],
+    "IsEditMode": true
+  },
+  "OnConnectMessage": {
+    "Expression": ""
+  },
+  "OnDisconnectMessage": {
+    "Expression": ""
+  },
+  "UpdateMessages": [
+    {
+      "Message": {
+        "Expression": "'S:'+format([DataCorePlugin.GameData.NewData.SpeedKmh],'0')+';R:;G:'+[Gear]+';\\n'"
+      },
+      "IsEnabled": true,
+      "MaximumFrequency": 20
+    }
+  ]
+}
