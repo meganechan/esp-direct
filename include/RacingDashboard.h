@@ -40,10 +40,10 @@ private:
 	int cellTitleHeight = 0;
 	bool hasReceivedData = false;
 	
-	// ตัวแปรสำหรับเก็บข้อมูลจาก SimHub
-	int speed = 0;
-	int rpm = 0;
-	String gear = "N";
+			// ตัวแปรสำหรับเก็บข้อมูลจาก SimHub
+		int speed = 0;
+		int rpm = 0;
+		String gear = "N";
 	
 	// ตัวแปรสำหรับตรวจสอบว่ามีการอัพเดทข้อมูลใหม่หรือไม่
 	bool dataUpdated = false;
@@ -238,38 +238,42 @@ public:
 			String incomingString = Serial.readStringUntil('\n');
 
 			// แยกข้อมูล (Parse) จาก String ที่ได้รับ
-			// รูปแบบที่คาดหวังจาก SimHub คือ "S<speed>R<rpm>G<gear>"
-			// เช่น "S120R8500G4"
+			// รูปแบบที่คาดหวังจาก SimHub คือ "S:0;R:0;G:4;"
 
 			// ค้นหาตำแหน่งของตัวอักษรนำหน้าแต่ละค่า
-			int sPos = incomingString.indexOf('S');
-			int rPos = incomingString.indexOf('R');
-			int gPos = incomingString.indexOf('G');
+			int sPos = incomingString.indexOf("S:");
+			int rPos = incomingString.indexOf("R:");
+			int gPos = incomingString.indexOf("G:");
 
 			// ตัด String เพื่อเอาเฉพาะค่าของแต่ละตัวแปร
 			if (sPos != -1 && rPos != -1 && gPos != -1) {
-				String speedStr = incomingString.substring(sPos + 1, rPos);
-				String rpmStr = incomingString.substring(rPos + 1, gPos);
+				// หา semicolon หลังจากแต่ละค่า
+				int sEnd = incomingString.indexOf(';', sPos);
+				int rEnd = incomingString.indexOf(';', rPos);
+				int gEnd = incomingString.indexOf(';', gPos);
 				
-				// สำหรับค่าสุดท้าย (Gear) เราไม่ต้องหาตำแหน่งสิ้นสุด
-				String gearStr = incomingString.substring(gPos + 1);
+				if (sEnd != -1 && rEnd != -1 && gEnd != -1) {
+					String speedStr = incomingString.substring(sPos + 2, sEnd);
+					String rpmStr = incomingString.substring(rPos + 2, rEnd);
+					String gearStr = incomingString.substring(gPos + 2, gEnd);
 
-				// แปลง String เป็น int
-				speed = speedStr.toInt();
-				rpm = rpmStr.toInt();
-				gear = gearStr;
+					// แปลง String เป็น int
+					speed = speedStr.toInt();
+					rpm = rpmStr.toInt();
+					gear = gearStr;
 
-				// แสดงผลลัพธ์ที่ได้ใน Serial Monitor เพื่อตรวจสอบความถูกต้อง
-				Serial.print("Speed: ");
-				Serial.print(speed);
-				Serial.print(" km/h, RPM: ");
-				Serial.print(rpm);
-				Serial.print(", Gear: ");
-				Serial.println(gear);
-				
-				// ตั้งค่าให้อัพเดทจอ LCD
-				dataUpdated = true;
-				hasReceivedData = true;
+					// แสดงผลลัพธ์ที่ได้ใน Serial Monitor เพื่อตรวจสอบความถูกต้อง
+					Serial.print("Speed: ");
+					Serial.print(speed);
+					Serial.print(" km/h, RPM: ");
+					Serial.print(rpm);
+					Serial.print(", Gear: ");
+					Serial.println(gear);
+					
+					// ตั้งค่าให้อัพเดทจอ LCD
+					dataUpdated = true;
+					hasReceivedData = true;
+				}
 			}
 		}
     }
@@ -290,8 +294,9 @@ public:
 		lv_label_set_text(gear_value_label, gear.c_str());
     }
 
-    void loop() {
-		read(); // อ่านข้อมูลจาก Serial
+    void update() {
+		// อ่านข้อมูลจาก Serial
+		read();
 		
 		// อัพเดทจอ LCD เมื่อมีข้อมูลใหม่
 		if (dataUpdated) {
@@ -299,13 +304,8 @@ public:
 			dataUpdated = false;
 		}
 		
-		// Handle LVGL tasks
-		lv_timer_handler();
-    }
-
-    void idle() {
+		// จัดการ blinking animation เมื่อยังไม่ได้รับข้อมูล
 		if (!hasReceivedData) {
-			// สำหรับ LVGL จะใช้ blinking animation แทน
 			static unsigned long lastBlink = 0;
 			static bool visible = true;
 			
@@ -320,7 +320,7 @@ public:
 			}
 		}
 		
-		// Handle LVGL tasks
+		// Handle LVGL tasks (เรียกครั้งเดียวต่อ update cycle)
 		lv_timer_handler();
     }
 	

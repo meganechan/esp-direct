@@ -16,14 +16,6 @@ void setup() {
 }
 
 void loop() {
-  // ตรวจสอบว่ามีข้อมูลส่งมาจาก SimHub หรือไม่
-  if (Serial.available() > 0) {
-    racingDashboard->read();
-  }
-  
-  // อัพเดทการแสดงผล
-  racingDashboard->loop();
-  
-  // idle processing
-  racingDashboard->idle();
+  // เรียกฟังก์ชันเดียวที่รวมทุกอย่างไว้
+  racingDashboard->update();
 }
