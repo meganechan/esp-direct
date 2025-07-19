@@ -43,10 +43,11 @@ private:
 	// ตัวแปรสำหรับเก็บข้อมูลจาก SimHub
 	int speed = 0;
 	int rpm = 0;
+	int maxRpm = 8000;
+	float fuel = 0.0;
 	String gear = "N";
 	String lastLap = "00:00.000";
 	String nextLap = "00:00.000";
-	bool shiftLight = false;
 	
 	// ตัวแปรสำหรับตรวจสอบว่ามีการอัพเดทข้อมูลใหม่หรือไม่
 	bool dataUpdated = false;
@@ -55,14 +56,20 @@ private:
 	lv_obj_t *main_screen;
 	lv_obj_t *gear_container;
 	lv_obj_t *speed_container;
-	lv_obj_t *shift_light_container;
+	lv_obj_t *rpm_container;
+	lv_obj_t *fuel_container;
 	lv_obj_t *lap_container;
 	lv_obj_t *gear_label;
 	lv_obj_t *gear_value_label;
 	lv_obj_t *speed_label;
 	lv_obj_t *speed_value_label;
 	lv_obj_t *speed_unit_label;
-	lv_obj_t *shift_light_label;
+	lv_obj_t *rpm_label;
+	lv_obj_t *rpm_value_label;
+	lv_obj_t *rpm_unit_label;
+	lv_obj_t *fuel_label;
+	lv_obj_t *fuel_value_label;
+	lv_obj_t *fuel_unit_label;
 	lv_obj_t *last_lap_label;
 	lv_obj_t *last_lap_value_label;
 	lv_obj_t *next_lap_label;
@@ -73,7 +80,8 @@ private:
 	lv_style_t style_container;
 	lv_style_t style_gear;
 	lv_style_t style_speed;
-	lv_style_t style_shift_light;
+	lv_style_t style_rpm;
+	lv_style_t style_fuel;
 	lv_style_t style_lap;
 	lv_style_t style_waiting;
 	
@@ -135,10 +143,15 @@ public:
 		lv_style_set_text_font(&style_speed, &lv_font_montserrat_40);
 		lv_style_set_text_color(&style_speed, lv_color_white());
 		
-		// Shift light style
-		lv_style_init(&style_shift_light);
-		lv_style_set_text_font(&style_shift_light, &lv_font_montserrat_36);
-		lv_style_set_text_color(&style_shift_light, lv_color_hex(0xFF0000)); // Red
+		// RPM style
+		lv_style_init(&style_rpm);
+		lv_style_set_text_font(&style_rpm, &lv_font_montserrat_36);
+		lv_style_set_text_color(&style_rpm, lv_color_hex(0xFF8800)); // Orange
+		
+		// Fuel style
+		lv_style_init(&style_fuel);
+		lv_style_set_text_font(&style_fuel, &lv_font_montserrat_32);
+		lv_style_set_text_color(&style_fuel, lv_color_hex(0x00AAFF)); // Blue
 		
 		// Lap style
 		lv_style_init(&style_lap);
@@ -171,10 +184,10 @@ public:
 		lv_obj_add_style(gear_value_label, &style_gear, 0);
 		lv_obj_align(gear_value_label, LV_ALIGN_CENTER, 0, 20);
 		
-		// Speed container - ด้านบน
+		// Speed container - ด้านซ้าย
 		speed_container = lv_obj_create(main_screen);
 		lv_obj_add_style(speed_container, &style_container, 0);
-		lv_obj_set_size(speed_container, 200, 120);
+		lv_obj_set_size(speed_container, 180, 120);
 		lv_obj_set_pos(speed_container, 50, 50);
 		
 		// Speed title
@@ -193,22 +206,62 @@ public:
 		// Speed unit
 		speed_unit_label = lv_label_create(speed_container);
 		lv_label_set_text(speed_unit_label, "km/h");
-		lv_obj_set_style_text_font(speed_unit_label, &lv_font_montserrat_16, 0);
+		lv_obj_set_style_text_font(speed_unit_label, &lv_font_montserrat_14, 0);
 		lv_obj_set_style_text_color(speed_unit_label, lv_color_white(), 0);
 		lv_obj_align_to(speed_unit_label, speed_value_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 		
-		// Shift light container - ด้านขวา
-		shift_light_container = lv_obj_create(main_screen);
-		lv_obj_add_style(shift_light_container, &style_container, 0);
-		lv_obj_set_size(shift_light_container, 200, 120);
-		lv_obj_set_pos(shift_light_container, 550, 50);
+		// RPM container - ด้านขวา
+		rpm_container = lv_obj_create(main_screen);
+		lv_obj_add_style(rpm_container, &style_container, 0);
+		lv_obj_set_size(rpm_container, 180, 120);
+		lv_obj_set_pos(rpm_container, 570, 50);
 		
-		// Shift light title
-		shift_light_label = lv_label_create(shift_light_container);
-		lv_label_set_text(shift_light_label, "SHIFT");
-		lv_obj_set_style_text_font(shift_light_label, &lv_font_montserrat_20, 0);
-		lv_obj_set_style_text_color(shift_light_label, lv_color_hex(0xFF00FF), 0); // Magenta
-		lv_obj_align(shift_light_label, LV_ALIGN_TOP_MID, 0, 10);
+		// RPM title
+		rpm_label = lv_label_create(rpm_container);
+		lv_label_set_text(rpm_label, "RPM");
+		lv_obj_set_style_text_font(rpm_label, &lv_font_montserrat_20, 0);
+		lv_obj_set_style_text_color(rpm_label, lv_color_hex(0xFF8800), 0); // Orange
+		lv_obj_align(rpm_label, LV_ALIGN_TOP_MID, 0, 10);
+		
+		// RPM value
+		rpm_value_label = lv_label_create(rpm_container);
+		lv_label_set_text(rpm_value_label, "0");
+		lv_obj_add_style(rpm_value_label, &style_rpm, 0);
+		lv_obj_align(rpm_value_label, LV_ALIGN_CENTER, 0, 10);
+		
+		// RPM unit
+		rpm_unit_label = lv_label_create(rpm_container);
+		lv_label_set_text_fmt(rpm_unit_label, "/%d", maxRpm);
+		lv_obj_set_style_text_font(rpm_unit_label, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(rpm_unit_label, lv_color_white(), 0);
+		lv_obj_align_to(rpm_unit_label, rpm_value_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
+		
+		// Fuel container - ด้านบนขวา
+		fuel_container = lv_obj_create(main_screen);
+		lv_obj_add_style(fuel_container, &style_container, 0);
+		lv_obj_set_size(fuel_container, 160, 100);
+		lv_obj_set_pos(fuel_container, 590, 180);
+		
+		// Fuel title
+		fuel_label = lv_label_create(fuel_container);
+		lv_label_set_text(fuel_label, "FUEL");
+		lv_obj_set_style_text_font(fuel_label, &lv_font_montserrat_16, 0);
+		lv_obj_set_style_text_color(fuel_label, lv_color_hex(0x00AAFF), 0); // Blue
+		lv_obj_align(fuel_label, LV_ALIGN_TOP_MID, 0, 5);
+		
+		// Fuel value
+		fuel_value_label = lv_label_create(fuel_container);
+		lv_label_set_text(fuel_value_label, "0.0");
+		lv_obj_add_style(fuel_value_label, &style_fuel, 0);
+		lv_obj_align(fuel_value_label, LV_ALIGN_CENTER, 0, 5);
+		
+		// Fuel unit
+		fuel_unit_label = lv_label_create(fuel_container);
+		lv_label_set_text(fuel_unit_label, "L");
+		lv_obj_set_style_text_font(fuel_unit_label, &lv_font_montserrat_14, 0);
+		lv_obj_set_style_text_color(fuel_unit_label, lv_color_white(), 0);
+		lv_obj_align_to(fuel_unit_label, fuel_value_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 3);
+		
 		
 		// Lap container - ด้านล่าง
 		lap_container = lv_obj_create(main_screen);
@@ -251,7 +304,8 @@ public:
 		// ซ่อน UI elements หลัก
 		lv_obj_add_flag(gear_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(speed_container, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_add_flag(shift_light_container, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(rpm_container, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(fuel_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(lap_container, LV_OBJ_FLAG_HIDDEN);
 		
 		// แสดง waiting message
@@ -265,7 +319,8 @@ public:
 		// แสดง UI elements หลัก
 		lv_obj_clear_flag(gear_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(speed_container, LV_OBJ_FLAG_HIDDEN);
-		lv_obj_clear_flag(shift_light_container, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(rpm_container, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(fuel_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(lap_container, LV_OBJ_FLAG_HIDDEN);
 	}
 
@@ -273,81 +328,127 @@ public:
 	void read() {
 		// ตรวจสอบว่ามีข้อมูลส่งมาจาก SimHub หรือไม่
 		if (Serial.available() > 0) {
-			// อ่านข้อมูลที่เข้ามาทีละบรรทัด (จนกว่าจะเจอเครื่องหมาย '\n')
-			String incomingString = Serial.readStringUntil('\n');
-
-			// แยกข้อมูล (Parse) จาก String ที่ได้รับ
-			// รูปแบบที่คาดหวังจาก SimHub คือ "S:0;R:0;G:4;L:00:00.000;N:00:00.000;SH:0;"
-
-			// ค้นหาตำแหน่งของตัวอักษรนำหน้าแต่ละค่า
-			int sPos = incomingString.indexOf("S:");
-			int rPos = incomingString.indexOf("R:");
-			int gPos = incomingString.indexOf("G:");
-			int lPos = incomingString.indexOf("L:");
-			int nPos = incomingString.indexOf("N:");
-			int shPos = incomingString.indexOf("SH:");
-
-			// ตัด String เพื่อเอาเฉพาะค่าของแต่ละตัวแปร
-			if (sPos != -1 && rPos != -1 && gPos != -1) {
-				// หา semicolon หลังจากแต่ละค่า
-				int sEnd = incomingString.indexOf(';', sPos);
-				int rEnd = incomingString.indexOf(';', rPos);
-				int gEnd = incomingString.indexOf(';', gPos);
+			static char buffer[128];
+			static int bufferIndex = 0;
+			
+			// อ่านข้อมูลทีละไบต์จนครบบรรทัด
+			while (Serial.available() > 0) {
+				char c = Serial.read();
 				
-				if (sEnd != -1 && rEnd != -1 && gEnd != -1) {
-					String speedStr = incomingString.substring(sPos + 2, sEnd);
-					String rpmStr = incomingString.substring(rPos + 2, rEnd);
-					String gearStr = incomingString.substring(gPos + 2, gEnd);
-
-					// แปลง String เป็น int
-					speed = speedStr.toInt();
-					rpm = rpmStr.toInt();
-					gear = gearStr;
-					
-					// อ่านข้อมูล lap และ shift light
-					if (lPos != -1) {
-						int lEnd = incomingString.indexOf(';', lPos);
-						if (lEnd != -1) {
-							lastLap = incomingString.substring(lPos + 2, lEnd);
-						}
+				if (c == '\n' || c == '\r') {
+					if (bufferIndex > 0) {
+						buffer[bufferIndex] = '\0'; // null terminate
+						
+						// Parse ข้อมูลแบบ manual parsing (เร็วกว่า String operations)
+						parseData(buffer);
+						
+						bufferIndex = 0; // reset buffer
 					}
-					
-					if (nPos != -1) {
-						int nEnd = incomingString.indexOf(';', nPos);
-						if (nEnd != -1) {
-							nextLap = incomingString.substring(nPos + 2, nEnd);
-						}
-					}
-					
-					if (shPos != -1) {
-						int shEnd = incomingString.indexOf(';', shPos);
-						if (shEnd != -1) {
-							String shiftStr = incomingString.substring(shPos + 3, shEnd);
-							shiftLight = (shiftStr.toInt() == 1);
-						}
-					}
-
-					// แสดงผลลัพธ์ที่ได้ใน Serial Monitor เพื่อตรวจสอบความถูกต้อง
-					Serial.print("Speed: ");
-					Serial.print(speed);
-					Serial.print(" km/h, RPM: ");
-					Serial.print(rpm);
-					Serial.print(", Gear: ");
-					Serial.print(gear);
-					Serial.print(", Last Lap: ");
-					Serial.print(lastLap);
-					Serial.print(", Next Lap: ");
-					Serial.print(nextLap);
-					Serial.print(", Shift Light: ");
-					Serial.println(shiftLight ? "ON" : "OFF");
-					
-					// ตั้งค่าให้อัพเดทจอ LCD
-					dataUpdated = true;
-					hasReceivedData = true;
+					break;
+				} else if (bufferIndex < 127) {
+					buffer[bufferIndex++] = c;
 				}
 			}
 		}
     }
+	
+	// Fast parsing function
+	void parseData(char* data) {
+		char* ptr = data;
+		char tempStr[16];
+		
+		// Parse format: "S:120;R:6500;MR:8000;F:45.5;G:4;L:01:23.456;N:01:20.123;"
+		while (*ptr) {
+			if (*ptr == 'S' && *(ptr+1) == ':') {
+				ptr += 2;
+				int i = 0;
+				while (*ptr && *ptr != ';' && i < 15) {
+					tempStr[i++] = *ptr++;
+				}
+				tempStr[i] = '\0';
+				speed = atoi(tempStr);
+			}
+			else if (*ptr == 'R' && *(ptr+1) == ':') {
+				ptr += 2;
+				int i = 0;
+				while (*ptr && *ptr != ';' && i < 15) {
+					tempStr[i++] = *ptr++;
+				}
+				tempStr[i] = '\0';
+				rpm = atoi(tempStr);
+			}
+			else if (*ptr == 'M' && *(ptr+1) == 'R' && *(ptr+2) == ':') {
+				ptr += 3;
+				int i = 0;
+				while (*ptr && *ptr != ';' && i < 15) {
+					tempStr[i++] = *ptr++;
+				}
+				tempStr[i] = '\0';
+				maxRpm = atoi(tempStr);
+				// อัพเดท RPM unit label
+				lv_label_set_text_fmt(rpm_unit_label, "/%d", maxRpm);
+			}
+			else if (*ptr == 'F' && *(ptr+1) == ':') {
+				ptr += 2;
+				int i = 0;
+				while (*ptr && *ptr != ';' && i < 15) {
+					tempStr[i++] = *ptr++;
+				}
+				tempStr[i] = '\0';
+				fuel = atof(tempStr);
+			}
+			else if (*ptr == 'G' && *(ptr+1) == ':') {
+				ptr += 2;
+				int i = 0;
+				while (*ptr && *ptr != ';' && i < 15) {
+					tempStr[i++] = *ptr++;
+				}
+				tempStr[i] = '\0';
+				gear = String(tempStr);
+			}
+			else if (*ptr == 'L' && *(ptr+1) == ':') {
+				ptr += 2;
+				int i = 0;
+				while (*ptr && *ptr != ';' && i < 15) {
+					tempStr[i++] = *ptr++;
+				}
+				tempStr[i] = '\0';
+				lastLap = String(tempStr);
+			}
+			else if (*ptr == 'N' && *(ptr+1) == ':') {
+				ptr += 2;
+				int i = 0;
+				while (*ptr && *ptr != ';' && i < 15) {
+					tempStr[i++] = *ptr++;
+				}
+				tempStr[i] = '\0';
+				nextLap = String(tempStr);
+			}
+			else {
+				ptr++;
+			}
+		}
+		
+		// แสดงผลลัพธ์ที่ได้ใน Serial Monitor เพื่อตรวจสอบความถูกต้อง
+		Serial.print("Speed: ");
+		Serial.print(speed);
+		Serial.print(" km/h, RPM: ");
+		Serial.print(rpm);
+		Serial.print("/");
+		Serial.print(maxRpm);
+		Serial.print(", Fuel: ");
+		Serial.print(fuel);
+		Serial.print("L, Gear: ");
+		Serial.print(gear);
+		Serial.print(", Last Lap: ");
+		Serial.print(lastLap);
+		Serial.print(", Next Lap: ");
+		Serial.println(nextLap);
+		
+		// ตั้งค่าให้อัพเดทจอ LCD
+		dataUpdated = true;
+		hasReceivedData = true;
+	}
 
     void displayData() {
 		// แสดง dashboard หากได้รับข้อมูลแล้ว
@@ -361,14 +462,11 @@ public:
 		// อัพเดท speed value
 		lv_label_set_text_fmt(speed_value_label, "%d", speed);
 		
-		// อัพเดท shift light
-		if (shiftLight) {
-			lv_label_set_text(shift_light_label, "SHIFT NOW!");
-			lv_obj_set_style_text_color(shift_light_label, lv_color_hex(0xFF0000), 0); // Red
-		} else {
-			lv_label_set_text(shift_light_label, "SHIFT");
-			lv_obj_set_style_text_color(shift_light_label, lv_color_hex(0xFF00FF), 0); // Magenta
-		}
+		// อัพเดท RPM value
+		lv_label_set_text_fmt(rpm_value_label, "%d", rpm);
+		
+		// อัพเดท fuel value
+		lv_label_set_text_fmt(fuel_value_label, "%.1f", fuel);
 		
 		// อัพเดท lap times
 		lv_label_set_text(last_lap_value_label, lastLap.c_str());
