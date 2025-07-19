@@ -15,6 +15,12 @@
 
 #define TFT_BL 2 // backlight pin
 
+
+LV_FONT_DECLARE(segment_font_72);
+LV_FONT_DECLARE(segment_font_48);
+LV_FONT_DECLARE(segment_font_96);
+LV_FONT_DECLARE(segment_font_216);
+
 // Arduino GFX as low-level driver for LVGL
 Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
     5 /* DE */, 3 /* VSYNC */, 46 /* HSYNC */, 7 /* PCLK */,
@@ -34,6 +40,8 @@ static lv_color_t buf[PIXEL_WIDTH * 10];
 
 std::map<String, String> prevData;
 std::map<String, int32_t> prevColor;
+
+
 
 class RacingDashboard {
 private:
@@ -135,12 +143,12 @@ public:
 		
 		// Gear style - ใหญ่และเด่น
 		lv_style_init(&style_gear);
-		lv_style_set_text_font(&style_gear, &lv_font_montserrat_48);
+		lv_style_set_text_font(&style_gear, &segment_font_216);
 		lv_style_set_text_color(&style_gear, lv_color_hex(0x00FF00)); // Green
 		
 		// Speed style
 		lv_style_init(&style_speed);
-		lv_style_set_text_font(&style_speed, &lv_font_montserrat_40);
+		lv_style_set_text_font(&style_speed, &segment_font_96);
 		lv_style_set_text_color(&style_speed, lv_color_white());
 		
 		// RPM style
@@ -171,12 +179,6 @@ public:
 		lv_obj_set_size(gear_container, 300, 200);
 		lv_obj_set_pos(gear_container, 250, 50);
 		
-		// Gear title
-		gear_label = lv_label_create(gear_container);
-		lv_label_set_text(gear_label, "GEAR");
-		lv_obj_set_style_text_font(gear_label, &lv_font_montserrat_28, 0);
-		lv_obj_set_style_text_color(gear_label, lv_color_hex(0x00FFFF), 0); // Cyan
-		lv_obj_align(gear_label, LV_ALIGN_TOP_MID, 0, 10);
 		
 		// Gear value - ใหญ่ที่สุด
 		gear_value_label = lv_label_create(gear_container);
@@ -190,25 +192,12 @@ public:
 		lv_obj_set_size(speed_container, 180, 120);
 		lv_obj_set_pos(speed_container, 50, 50);
 		
-		// Speed title
-		speed_label = lv_label_create(speed_container);
-		lv_label_set_text(speed_label, "SPEED");
-		lv_obj_set_style_text_font(speed_label, &lv_font_montserrat_20, 0);
-		lv_obj_set_style_text_color(speed_label, lv_color_hex(0xFFFF00), 0); // Yellow
-		lv_obj_align(speed_label, LV_ALIGN_TOP_MID, 0, 10);
-		
+
 		// Speed value
 		speed_value_label = lv_label_create(speed_container);
 		lv_label_set_text(speed_value_label, "0");
 		lv_obj_add_style(speed_value_label, &style_speed, 0);
 		lv_obj_align(speed_value_label, LV_ALIGN_CENTER, 0, 10);
-		
-		// Speed unit
-		speed_unit_label = lv_label_create(speed_container);
-		lv_label_set_text(speed_unit_label, "km/h");
-		lv_obj_set_style_text_font(speed_unit_label, &lv_font_montserrat_14, 0);
-		lv_obj_set_style_text_color(speed_unit_label, lv_color_white(), 0);
-		lv_obj_align_to(speed_unit_label, speed_value_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 		
 		// RPM container - ด้านขวา
 		rpm_container = lv_obj_create(main_screen);
