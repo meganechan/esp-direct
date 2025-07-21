@@ -46,7 +46,7 @@ std::map<String, int32_t> prevColor;
 class RacingDashboard {
 private:
 	int cellTitleHeight = 0;
-	bool hasReceivedData = false;
+	bool hasReceivedData = true;
 	
 	// ตัวแปรสำหรับเก็บข้อมูลจาก SimHub
 	int speed = 0;
@@ -62,6 +62,8 @@ private:
 	
 	// LVGL UI objects
 	lv_obj_t *main_screen;
+	lv_obj_t *rpm_bar_container;
+	lv_obj_t *rpm_bar;
 	lv_obj_t *gear_container;
 	lv_obj_t *speed_container;
 	lv_obj_t *rpm_container;
@@ -86,6 +88,7 @@ private:
 	
 	// สไตล์
 	lv_style_t style_container;
+	lv_style_t style_rpm_bar;
 	lv_style_t style_gear;
 	lv_style_t style_speed;
 	lv_style_t style_rpm;
@@ -129,17 +132,21 @@ public:
 		// สร้าง UI elements
 		createUI();
 		
-		// แสดงข้อความเริ่มต้น
-		showWaitingMessage();
+		// แสดง dashboard ตั้งแต่เริ่มต้น
+		showDashboard();
 	}
 	
 	void setupStyles() {
 		// Container style
 		lv_style_init(&style_container);
-		lv_style_set_border_color(&style_container, lv_color_white());
-		lv_style_set_border_width(&style_container, 2);
 		lv_style_set_bg_color(&style_container, lv_color_black());
 		lv_style_set_bg_opa(&style_container, LV_OPA_COVER);
+		
+		// RPM Bar style
+		lv_style_init(&style_rpm_bar);
+		lv_style_set_bg_color(&style_rpm_bar, lv_color_black());
+		lv_style_set_bg_opa(&style_rpm_bar, LV_OPA_COVER);
+
 		
 		// Gear style - ใหญ่และเด่น
 		lv_style_init(&style_gear);
@@ -173,37 +180,54 @@ public:
 	}
 	
 	void createUI() {
-		// Gear container - ใหญ่และอยู่กลาง
+		// RPM Bar container - บนสุดของหน้าจอ
+		rpm_bar_container = lv_obj_create(main_screen);
+		lv_obj_add_style(rpm_bar_container, &style_rpm_bar, 0);
+		lv_obj_set_size(rpm_bar_container, PIXEL_WIDTH, 70);
+		lv_obj_set_pos(rpm_bar_container, 10, 10);
+		
+		// เอากรอบออกจาก RPM bar container
+		lv_obj_set_style_border_width(rpm_bar_container, 0, 0);
+		
+		// RPM Bar
+		rpm_bar = lv_bar_create(rpm_bar_container);
+		lv_obj_set_size(rpm_bar, PIXEL_WIDTH - 40, 40); // ขยายให้เต็มพื้นที่มากขึ้น
+		lv_obj_align(rpm_bar, LV_ALIGN_CENTER, 0, 0);
+		lv_bar_set_range(rpm_bar, 0, 100); // ใช้ percentage
+		lv_bar_set_value(rpm_bar, 0, LV_ANIM_OFF);
+		
+		
+		// Gear container - ใหญ่และอยู่กลาง (ปรับตำแหน่งลงมา)
 		gear_container = lv_obj_create(main_screen);
 		lv_obj_add_style(gear_container, &style_container, 0);
-		lv_obj_set_size(gear_container, 300, 200);
-		lv_obj_set_pos(gear_container, 250, 50);
+		lv_obj_set_size(gear_container, 350, 220); // ขยายขนาดให้ใหญ่ขึ้น
+		lv_obj_set_pos(gear_container, 225, 90); // ปรับตำแหน่ง X ให้กลาง
 		
 		
 		// Gear value - ใหญ่ที่สุด
 		gear_value_label = lv_label_create(gear_container);
 		lv_label_set_text(gear_value_label, "N");
 		lv_obj_add_style(gear_value_label, &style_gear, 0);
-		lv_obj_align(gear_value_label, LV_ALIGN_CENTER, 0, 20);
+		lv_obj_align(gear_value_label, LV_ALIGN_CENTER, 0, 0);
 		
-		// Speed container - ด้านซ้าย
+		// Speed container - ด้านซ้าย (ปรับตำแหน่งลงมา)
 		speed_container = lv_obj_create(main_screen);
 		lv_obj_add_style(speed_container, &style_container, 0);
-		lv_obj_set_size(speed_container, 180, 120);
-		lv_obj_set_pos(speed_container, 50, 50);
+		lv_obj_set_size(speed_container, 180, 120); // ขยายขนาดให้ใหญ่ขึ้น
+		lv_obj_set_pos(speed_container, 35, 90); // ปรับตำแหน่ง X
 		
 
 		// Speed value
 		speed_value_label = lv_label_create(speed_container);
 		lv_label_set_text(speed_value_label, "0");
 		lv_obj_add_style(speed_value_label, &style_speed, 0);
-		lv_obj_align(speed_value_label, LV_ALIGN_CENTER, 0, 10);
+		lv_obj_align(speed_value_label, LV_ALIGN_CENTER, 0, 0);
 		
-		// RPM container - ด้านขวา
+		// RPM container - ด้านขวา (ปรับตำแหน่งลงมา)
 		rpm_container = lv_obj_create(main_screen);
 		lv_obj_add_style(rpm_container, &style_container, 0);
 		lv_obj_set_size(rpm_container, 180, 120);
-		lv_obj_set_pos(rpm_container, 570, 50);
+		lv_obj_set_pos(rpm_container, 570, 90); // เพิ่ม Y position
 		
 		// RPM title
 		rpm_label = lv_label_create(rpm_container);
@@ -225,11 +249,11 @@ public:
 		lv_obj_set_style_text_color(rpm_unit_label, lv_color_white(), 0);
 		lv_obj_align_to(rpm_unit_label, rpm_value_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 5);
 		
-		// Fuel container - ด้านบนขวา
+		// Fuel container - ด้านบนขวา (ปรับตำแหน่งลงมา)
 		fuel_container = lv_obj_create(main_screen);
 		lv_obj_add_style(fuel_container, &style_container, 0);
 		lv_obj_set_size(fuel_container, 160, 100);
-		lv_obj_set_pos(fuel_container, 590, 180);
+		lv_obj_set_pos(fuel_container, 590, 220); // เพิ่ม Y position
 		
 		// Fuel title
 		fuel_label = lv_label_create(fuel_container);
@@ -252,11 +276,11 @@ public:
 		lv_obj_align_to(fuel_unit_label, fuel_value_label, LV_ALIGN_OUT_BOTTOM_MID, 0, 3);
 		
 		
-		// Lap container - ด้านล่าง
+		// Lap container - ด้านล่าง (ปรับตำแหน่งลงมา)
 		lap_container = lv_obj_create(main_screen);
 		lv_obj_add_style(lap_container, &style_container, 0);
 		lv_obj_set_size(lap_container, 700, 150);
-		lv_obj_set_pos(lap_container, 50, 280);
+		lv_obj_set_pos(lap_container, 50, 320); // เพิ่ม Y position
 		
 		// Last lap
 		last_lap_label = lv_label_create(lap_container);
@@ -291,6 +315,7 @@ public:
 	
 	void showWaitingMessage() {
 		// ซ่อน UI elements หลัก
+		lv_obj_add_flag(rpm_bar_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(gear_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(speed_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_add_flag(rpm_container, LV_OBJ_FLAG_HIDDEN);
@@ -306,6 +331,7 @@ public:
 		lv_obj_add_flag(waiting_label, LV_OBJ_FLAG_HIDDEN);
 		
 		// แสดง UI elements หลัก
+		lv_obj_clear_flag(rpm_bar_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(gear_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(speed_container, LV_OBJ_FLAG_HIDDEN);
 		lv_obj_clear_flag(rpm_container, LV_OBJ_FLAG_HIDDEN);
@@ -440,10 +466,31 @@ public:
 	}
 
     void displayData() {
-		// แสดง dashboard หากได้รับข้อมูลแล้ว
-		if (hasReceivedData) {
-			showDashboard();
+		// Dashboard แสดงตลอดเวลา ไม่ต้องตรวจสอบ hasReceivedData แล้ว
+		
+		// คำนวณ RPM percentage
+		int rpmPercentage = (rpm * 100) / maxRpm;
+		if (rpmPercentage > 100) rpmPercentage = 100;
+		
+		// อัพเดท RPM bar
+		lv_bar_set_value(rpm_bar, rpmPercentage, LV_ANIM_OFF);
+		
+		// เปลี่ยนสี RPM bar ตาม percentage (racing style)
+		lv_color_t barColor;
+		if (rpmPercentage < 50) {
+			// เขียว (0-50%)
+			barColor = lv_color_hex(0x00FF00);
+		} else if (rpmPercentage < 70) {
+			// เหลือง (50-70%)
+			barColor = lv_color_hex(0xFFFF00);
+		} else if (rpmPercentage < 85) {
+			// ส้ม (70-85%)
+			barColor = lv_color_hex(0xFF8800);
+		} else {
+			// แดง (85-100%)
+			barColor = lv_color_hex(0xFF0000);
 		}
+		lv_obj_set_style_bg_color(rpm_bar, barColor, LV_PART_INDICATOR);
 		
 		// อัพเดท gear value
 		lv_label_set_text(gear_value_label, gear.c_str());
@@ -472,21 +519,8 @@ public:
 			dataUpdated = false;
 		}
 		
-		// จัดการ blinking animation เมื่อยังไม่ได้รับข้อมูล
-		if (!hasReceivedData) {
-			static unsigned long lastBlink = 0;
-			static bool visible = true;
-			
-			if (millis() - lastBlink > 1000) {
-				if (visible) {
-					lv_obj_clear_flag(waiting_label, LV_OBJ_FLAG_HIDDEN);
-				} else {
-					lv_obj_add_flag(waiting_label, LV_OBJ_FLAG_HIDDEN);
-				}
-				visible = !visible;
-				lastBlink = millis();
-			}
-		}
+		// Dashboard จะแสดงตลอดเวลา - ไม่ต้องใช้ blinking animation อีกแล้ว
+		// Blinking animation ถูกปิดเพราะเราแสดง dashboard ตลอดเวลา
 		
 		// Handle LVGL tasks (เรียกครั้งเดียวต่อ update cycle)
 		lv_timer_handler();
