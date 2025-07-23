@@ -31,14 +31,14 @@ Arduino_ESP32RGBPanel *rgbpanel = new Arduino_ESP32RGBPanel(
     14 /* B0 */, 38 /* B1 */, 18 /* B2 */, 17 /* B3 */, 10 /* B4 */,
     0 /* hsync_polarity */, 8 /* hsync_front_porch */, 4 /* hsync_pulse_width */, 16 /* hsync_back_porch */,
     0 /* vsync_polarity */, 4 /* vsync_front_porch */, 4 /* vsync_pulse_width */, 4 /* vsync_back_porch */,
-    1 /* pclk_active_neg */, 16000000 /* prefer_speed */);
+    1 /* pclk_active_neg */, 20000000 /* prefer_speed */);
 
 Arduino_RGB_Display *gfx = new Arduino_RGB_Display(
     PIXEL_WIDTH /* width */, PIXEL_HEIGHT /* height */, rgbpanel, 0 /* rotation */, true /* auto_flush */);
 
-// LVGL display buffer
+// LVGL display buffer - เพิ่มขนาด buffer สำหรับ 60 fps ที่ไม่กระพริบ
 static lv_disp_draw_buf_t draw_buf;
-static lv_color_t buf[PIXEL_WIDTH * 10];
+static lv_color_t buf[PIXEL_WIDTH * 30]; // เพิ่มจาก 10 เป็น 30 บรรทัด
 
 std::map<String, String> prevData;
 std::map<String, int32_t> prevColor;
@@ -50,6 +50,12 @@ private:
 	int cellTitleHeight = 0;
 	bool hasReceivedData = true;
 	
+	// ตัวแปรสำหรับควบคุม frame rate
+	unsigned long lastFrameTime = 0;
+	const unsigned long targetFrameTime = 16; // 16ms = 60 fps (1000ms/60fps = 16.67ms)
+	unsigned long lastLvglUpdate = 0;
+	const unsigned long lvglUpdateInterval = 5; // อัพเดท LVGL ทุก 5ms
+	
 	// ตัวแปรสำหรับเก็บข้อมูลจาก SimHub
 	int speed = 0;
 	int rpm = 0;
@@ -60,6 +66,7 @@ private:
 	
 	// ตัวแปรสำหรับตรวจสอบว่ามีการอัพเดทข้อมูลใหม่หรือไม่
 	bool dataUpdated = false;
+	bool needsRedraw = false; // ตัวแปรสำหรับควบคุมการ redraw
 	
 	// LVGL UI objects
 	lv_obj_t *main_screen;
@@ -108,7 +115,7 @@ public:
 		lv_init();
 		
 		// Initialize display buffer
-		lv_disp_draw_buf_init(&draw_buf, buf, NULL, PIXEL_WIDTH * 10);
+		lv_disp_draw_buf_init(&draw_buf, buf, NULL, PIXEL_WIDTH * 30);
 		
 		// Initialize display driver
 		static lv_disp_drv_t disp_drv;
@@ -463,6 +470,7 @@ public:
 		
 		// ตั้งค่าให้อัพเดทจอ LCD
 		dataUpdated = true;
+		needsRedraw = true;
 		hasReceivedData = true;
 	}
 
@@ -473,75 +481,133 @@ public:
 		int rpmPercentage = (rpm * 100) / maxRpm;
 		if (rpmPercentage > 100) rpmPercentage = 100;
 		
-		// อัพเดท RPM bar
+		// อัพเดท RPM bar (ใช้ LV_ANIM_OFF เพื่อไม่ให้กระพริบ)
 		lv_bar_set_value(rpm_bar, rpmPercentage, LV_ANIM_OFF);
 		
 		// เปลี่ยนสี RPM bar ตาม percentage (racing style)
+		static int lastRpmColorZone = -1; // เก็บโซนสีก่อนหน้า
+		int currentColorZone;
 		lv_color_t barColor;
+		
 		if (rpmPercentage < 50) {
 			// เขียว (0-50%)
 			barColor = lv_color_hex(0x00FF00);
+			currentColorZone = 0;
 		} else if (rpmPercentage < 70) {
 			// เหลือง (50-70%)
 			barColor = lv_color_hex(0xFFFF00);
+			currentColorZone = 1;
 		} else if (rpmPercentage < 85) {
 			// ส้ม (70-85%)
 			barColor = lv_color_hex(0xFF8800);
+			currentColorZone = 2;
 		} else {
 			// แดง (85-100%)
 			barColor = lv_color_hex(0xFF0000);
+			currentColorZone = 3;
 		}
-		lv_obj_set_style_bg_color(rpm_bar, barColor, LV_PART_INDICATOR);
 		
-		// อัพเดท gear value
-		lv_label_set_text(gear_value_label, gear.c_str());
-		
-		// อัพเดท speed value
-		lv_label_set_text_fmt(speed_value_label, "%d", speed);
-		
-		// อัพเดท RPM value
-		lv_label_set_text_fmt(rpm_value_label, "%d", rpm);
-		
-		// อัพเดท fuel value
-		char fuelStr[16];
-		if (isnan(fuel) || isinf(fuel)) {
-			snprintf(fuelStr, sizeof(fuelStr), "-.--");
-		} else {
-			snprintf(fuelStr, sizeof(fuelStr), "%.1f", fuel);
+		// อัพเดทสีเฉพาะเมื่อโซนสีเปลี่ยน
+		if (currentColorZone != lastRpmColorZone) {
+			lv_obj_set_style_bg_color(rpm_bar, barColor, LV_PART_INDICATOR);
+			lastRpmColorZone = currentColorZone;
 		}
-		lv_label_set_text(fuel_value_label, fuelStr);
+		
+		// อัพเดท UI elements โดยใช้ static variables เพื่อเช็คการเปลี่ยนแปลง
+		static String lastGear = "";
+		static int lastSpeed = -1;
+		static int lastRpm = -1;
+		static float lastFuel = -999.0;
+		static String lastLapTime = "";
+		
+		// อัพเดท gear value เฉพาะเมื่อเปลี่ยน
+		if (gear != lastGear) {
+			lv_label_set_text(gear_value_label, gear.c_str());
+			lastGear = gear;
+		}
+		
+		// อัพเดท speed value เฉพาะเมื่อเปลี่ยน
+		if (speed != lastSpeed) {
+			lv_label_set_text_fmt(speed_value_label, "%d", speed);
+			lastSpeed = speed;
+		}
+		
+		// อัพเดท RPM value เฉพาะเมื่อเปลี่ยน
+		if (rpm != lastRpm) {
+			lv_label_set_text_fmt(rpm_value_label, "%d", rpm);
+			lastRpm = rpm;
+		}
+		
+		// อัพเดท fuel value เฉพาะเมื่อเปลี่ยน (ใช้ tolerance สำหรับ float)
+		if (abs(fuel - lastFuel) > 0.05) {
+			char fuelStr[16];
+			if (isnan(fuel) || isinf(fuel)) {
+				snprintf(fuelStr, sizeof(fuelStr), "-.--");
+			} else {
+				snprintf(fuelStr, sizeof(fuelStr), "%.1f", fuel);
+			}
+			lv_label_set_text(fuel_value_label, fuelStr);
+			lastFuel = fuel;
+		}
 
-		// อัพเดท lap time value
-		lv_label_set_text(laptime_value_label, lapTime.c_str());
+		// อัพเดท lap time value เฉพาะเมื่อเปลี่ยน
+		if (lapTime != lastLapTime) {
+			lv_label_set_text(laptime_value_label, lapTime.c_str());
+			lastLapTime = lapTime;
+		}
     }
 
     void update() {
-		// อ่านข้อมูลจาก Serial
+		unsigned long currentTime = millis();
+		
+		// อ่านข้อมูลจาก Serial (ทำได้บ่อย ๆ เพื่อไม่ให้ข้อมูลหาย)
 		read();
 		
-		// อัพเดทจอ LCD เมื่อมีข้อมูลใหม่
-		if (dataUpdated) {
-			displayData();
-			dataUpdated = false;
+		// ควบคุม frame rate ให้อยู่ที่ 60 fps
+		if (currentTime - lastFrameTime >= targetFrameTime) {
+			// อัพเดทจอ LCD เมื่อมีข้อมูลใหม่และถึงเวลา render
+			if (needsRedraw) {
+				displayData();
+				needsRedraw = false;
+				dataUpdated = false;
+			}
+			
+			lastFrameTime = currentTime;
 		}
 		
-		// Dashboard จะแสดงตลอดเวลา - ไม่ต้องใช้ blinking animation อีกแล้ว
-		// Blinking animation ถูกปิดเพราะเราแสดง dashboard ตลอดเวลา
-		
-		// Handle LVGL tasks (เรียกครั้งเดียวต่อ update cycle)
-		lv_timer_handler();
+		// Handle LVGL tasks ในอัตราที่เหมาะสม (ไม่บ่อยเกินไป)
+		if (currentTime - lastLvglUpdate >= lvglUpdateInterval) {
+			lv_timer_handler();
+			lastLvglUpdate = currentTime;
+		}
     }
 	
-	// Display flush callback function
+	// Display flush callback function - optimized สำหรับ 60 fps
 	static void my_disp_flush(lv_disp_drv_t * disp, const lv_area_t * area, lv_color_t * color_p) {
 		uint32_t w = (area->x2 - area->x1 + 1);
 		uint32_t h = (area->y2 - area->y1 + 1);
 
-		// ใช้ Arduino GFX เป็น low-level driver
+		// ใช้ Arduino GFX เป็น low-level driver พร้อม optimization
+		gfx->startWrite(); // เริ่ม transaction สำหรับความเร็ว
 		gfx->draw16bitRGBBitmap(area->x1, area->y1, (uint16_t*)color_p, w, h);
+		gfx->endWrite(); // จบ transaction
 		
 		// บอก LVGL ว่า flush เสร็จแล้ว
 		lv_disp_flush_ready(disp);
+	}
+	
+	// ฟังก์ชันสำหรับ debug frame rate
+	void printFPS() {
+		static unsigned long lastFPSUpdate = 0;
+		static int frameCount = 0;
+		frameCount++;
+		
+		if (millis() - lastFPSUpdate >= 1000) { // ทุก 1 วินาที
+			Serial.print("FPS: ");
+			Serial.println(frameCount);
+			frameCount = 0;
+			lastFPSUpdate = millis();
+		}
 	}
 
 };
