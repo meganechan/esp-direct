@@ -446,6 +446,8 @@ public:
 		}
 		
 		// แสดงผลลัพธ์ที่ได้ใน Serial Monitor เพื่อตรวจสอบความถูกต้อง
+		Serial.print("Received data: ");
+		Serial.println(data);
 		Serial.print("Speed: ");
 		Serial.print(speed);
 		Serial.print(" km/h, RPM: ");
@@ -453,7 +455,7 @@ public:
 		Serial.print("/");
 		Serial.print(maxRpm);
 		Serial.print(", Fuel: ");
-		Serial.print(fuel);
+		Serial.print(fuel, 1);  // แสดงทศนิยม 1 ตำแหน่ง
 		Serial.print("L, Gear: ");
 		Serial.print(gear);
 		Serial.print(", Lap Time: ");
@@ -501,7 +503,13 @@ public:
 		lv_label_set_text_fmt(rpm_value_label, "%d", rpm);
 		
 		// อัพเดท fuel value
-		lv_label_set_text_fmt(fuel_value_label, "%.1f", fuel);
+		char fuelStr[16];
+		if (isnan(fuel) || isinf(fuel)) {
+			snprintf(fuelStr, sizeof(fuelStr), "-.--");
+		} else {
+			snprintf(fuelStr, sizeof(fuelStr), "%.1f", fuel);
+		}
+		lv_label_set_text(fuel_value_label, fuelStr);
 
 		// อัพเดท lap time value
 		lv_label_set_text(laptime_value_label, lapTime.c_str());
